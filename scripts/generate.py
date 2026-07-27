@@ -22,8 +22,9 @@ from trends import collect_trends
 
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = "claude-opus-4-8"       # コスト優先なら claude-sonnet-5 に変更可
-POST_COUNT = 20
+POST_COUNT = 25
 TREND_COUNT = 10                # うちトレンド絡みの本数
+CASUAL_COUNT = 5                # うち超ラフな雑談ポストの本数
 KEYWORD = os.environ.get("KEYWORD", "").strip()   # 手動実行時に入る
 
 JST = datetime.timezone(datetime.timedelta(hours=9))
@@ -59,39 +60,48 @@ def build_user_prompt(trend_text):
         "「共感一言型」などをミックスし、同じ型が連続しないよう多様にすること。"
     )
 
+    casual_instruction = (
+        f"また、そのうち{CASUAL_COUNT}個は「超ラフな雑談ポスト」にすること。"
+        "問いかけでもトレンドでもなく、肩の力が抜けた独り言・つぶやき・ゆるいぼやきのような"
+        "テンション（例:「眠い」「今日の自分えらい」「コーヒーうますぎ」レベルの気軽さ）。"
+        "教訓やオチを無理に入れず、フォロワーが親近感を持つ素の一言でよい。"
+        "これらは trend:false、type:「ラフ雑談」とすること。"
+    )
+
     trend_block = ""
     trend_instruction = ""
     if trend_text:
         trend_block = f"\n\n# 参考トレンド情報（本日収集）\n{trend_text}\n"
         trend_instruction = (
-            f"このうち{TREND_COUNT}個は、上記トレンド情報を自然に絡めたポストにすること"
-            f"（無理に固有名詞を入れず、話題の空気感を活かす）。"
-            f"残り{POST_COUNT - TREND_COUNT}個は3本柱の定番ネタでミックスすること。"
+            f"{TREND_COUNT}個は、上記トレンド情報を自然に絡めたポストにすること"
+            f"（無理に固有名詞を入れず、話題の空気感を活かす。trend:true）。"
+            f"別の{POST_COUNT - TREND_COUNT - CASUAL_COUNT}個は3本柱の定番ネタでミックスすること（trend:false）。"
         )
     else:
         trend_instruction = (
-            f"投資／メンタル／職場あるあるの3本柱をバランスよくミックスして"
-            f"{POST_COUNT}個作ること。"
+            f"{POST_COUNT - CASUAL_COUNT}個は投資／メンタル／職場あるあるの3本柱を"
+            f"バランスよくミックスすること（trend:false）。"
         )
 
     if KEYWORD:
         theme = (
             f"今回のテーマキーワードは「{KEYWORD}」です。"
             f"このキーワードを軸にしつつ、3本柱と自然に絡めてください。"
-            f"さらに{TREND_COUNT}個は上記トレンドも絡めること。"
+            f"さらに{TREND_COUNT}個は上記トレンドも絡めること（trend:true）。"
         )
     else:
         theme = trend_instruction
 
     return f"""{theme}
+{casual_instruction}
 {type_note}
 {trend_block}
 # 出力形式（厳守）
 以下のJSON配列のみを出力してください。前置き・説明・コードフェンスは一切不要です。
 各要素は次のキーを持つオブジェクト:
 - "pillar": "投資" | "メンタル" | "職場あるある" のいずれか
-- "type": ポストの型（例:「あるある5個リスト」「会話形式」など）
-- "trend": true（トレンド絡み）または false（定番）
+- "type": ポストの型（例:「あるある5個リスト」「会話形式」「ラフ雑談」など）
+- "trend": true（トレンド絡み）または false（定番・ラフ雑談）
 - "text": ポスト本文（改行を含んでよい。投資系は免責込み）
 
 必ず{POST_COUNT}個。JSON配列だけを返すこと。"""
