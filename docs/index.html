@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Yuki mental log — 投稿ストック</title>
+<style>
+  :root {
+    --ink: #1c1a17;
+    --paper: #f7f4ed;
+    --card: #fffdf8;
+    --line: #e2dccf;
+    --muted: #8a8478;
+    --invest: #3f7d6e;   /* 投資: 落ち着いた緑 */
+    --mental: #b06f9a;   /* メンタル: くすんだ藤 */
+    --work:   #c08a3e;   /* 職場あるある: 黄土 */
+    --accent: #2f2b26;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.7;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 20px 16px 80px; }
+
+  /* --- ヘッダー --- */
+  header { padding: 24px 0 16px; border-bottom: 1px solid var(--line); }
+  .kicker { font-size: 12px; letter-spacing: .22em; color: var(--muted); text-transform: uppercase; }
+  h1 { margin: 4px 0 2px; font-size: 22px; font-weight: 800; letter-spacing: .02em; }
+  .sub { font-size: 13px; color: var(--muted); }
+
+  /* --- ロック画面 --- */
+  #gate {
+    position: fixed; inset: 0; background: var(--paper);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+    padding: 24px;
+  }
+  .gate-card { width: 100%; max-width: 340px; text-align: center; }
+  .gate-card h2 { font-size: 18px; margin: 0 0 4px; }
+  .gate-card p { font-size: 13px; color: var(--muted); margin: 0 0 20px; }
+  #pw {
+    width: 100%; padding: 13px 14px; font-size: 16px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+    text-align: center; letter-spacing: .1em;
+  }
+  #pw:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .gate-btn {
+    margin-top: 12px; width: 100%; padding: 13px; font-size: 15px; font-weight: 700;
+    border: none; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer;
+  }
+  .gate-err { color: #b0472f; font-size: 13px; min-height: 18px; margin-top: 10px; }
+
+  /* --- コントロール --- */
+  .controls { display: flex; gap: 8px; align-items: center; margin: 18px 0 8px; flex-wrap: wrap; }
+  select {
+    flex: 1; min-width: 140px; padding: 11px 12px; font-size: 15px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink);
+  }
+  .meta-row { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .filters { display: flex; gap: 6px; margin: 4px 0 18px; flex-wrap: wrap; }
+  .chip {
+    font-size: 12px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer;
+  }
+  .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* --- カード --- */
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line);
+    border-radius: 12px; padding: 14px 15px; margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .card[data-pillar="投資"]   { border-left-color: var(--invest); }
+  .card[data-pillar="メンタル"] { border-left-color: var(--mental); }
+  .card[data-pillar="職場あるある"] { border-left-color: var(--work); }
+  .tags { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #efeae0; color: var(--muted); }
+  .tag.pillar { color: #fff; }
+  .card[data-pillar="投資"]   .tag.pillar { background: var(--invest); }
+  .card[data-pillar="メンタル"] .tag.pillar { background: var(--mental); }
+  .card[data-pillar="職場あるある"] .tag.pillar { background: var(--work); }
+  .tag.trend { background: #2f2b26; color: #fff; }
+  .num { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .text { white-space: pre-wrap; font-size: 15px; margin: 0 0 12px; }
+  .count { font-size: 11px; color: var(--muted); }
+  .copy {
+    float: right; padding: 8px 16px; font-size: 13px; font-weight: 700;
+    border: 1px solid var(--accent); border-radius: 9px; background: var(--accent);
+    color: #fff; cursor: pointer;
+  }
+  .copy.done { background: var(--invest); border-color: var(--invest); }
+  .clear { clear: both; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- パスワードゲート -->
+<div id="gate">
+  <div class="gate-card">
+    <h2>投稿ストック</h2>
+    <p>合言葉を入力してください</p>
+    <input id="pw" type="password" inputmode="text" autocomplete="off" placeholder="合言葉">
+    <button class="gate-btn" onclick="unlock()">開く</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>
+</div>
+
+<div class="wrap hidden" id="app">
+  <header>
+    <div class="kicker">Yuki mental log</div>
+    <h1>投稿ストック</h1>
+    <div class="sub">1タップでコピーして、そのまま投稿へ</div>
+  </header>
+
+  <div class="controls">
+    <select id="dateSel" onchange="loadDate(this.value)"></select>
+  </div>
+  <div class="meta-row" id="meta"></div>
+
+  <div class="filters" id="filters">
+    <span class="chip on" data-f="all" onclick="setFilter('all')">すべて</span>
+    <span class="chip" data-f="投資" onclick="setFilter('投資')">投資</span>
+    <span class="chip" data-f="メンタル" onclick="setFilter('メンタル')">メンタル</span>
+    <span class="chip" data-f="職場あるある" onclick="setFilter('職場あるある')">職場あるある</span>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+// ===== 簡易パスワード =====
+// ここを自分の合言葉に変更してください（下の説明参照）
+const PASSWORD = "CHANGE_ME";
+
+let allPosts = [];
+let currentFilter = "all";
+
+function unlock() {
+  const v = document.getElementById("pw").value;
+  if (v === PASSWORD) {
+    sessionStorage.setItem("ok", "1");
+    showApp();
+  } else {
+    document.getElementById("gateErr").textContent = "合言葉が違います";
+  }
+}
+document.getElementById("pw").addEventListener("keydown", e => {
+  if (e.key === "Enter") unlock();
+});
+
+function showApp() {
+  document.getElementById("gate").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  init();
+}
+if (sessionStorage.getItem("ok") === "1") showApp();
+
+// ===== データ読み込み =====
+async function init() {
+  try {
+    const idx = await fetch("posts/index.json").then(r => r.json());
+    const sel = document.getElementById("dateSel");
+    sel.innerHTML = idx.dates.map(d => `<option value="${d}">${d}</option>`).join("");
+    if (idx.dates.length) loadDate(idx.dates[0]);
+    else document.getElementById("list").innerHTML = '<div class="empty">まだ生成データがありません</div>';
+  } catch (e) {
+    document.getElementById("list").innerHTML = '<div class="empty">読み込みに失敗しました</div>';
+  }
+}
+
+async function loadDate(date) {
+  const rec = await fetch(`posts/${date}.json`).then(r => r.json());
+  allPosts = rec.posts || [];
+  const modeLabel = rec.mode === "manual"
+    ? `手動生成${rec.keyword ? "・キーワード:「" + rec.keyword + "」" : ""}`
+    : "定時生成";
+  document.getElementById("meta").textContent = `${allPosts.length}件 ／ ${modeLabel}`;
+  render();
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll(".chip").forEach(c =>
+    c.classList.toggle("on", c.dataset.f === f));
+  render();
+}
+
+function render() {
+  const list = document.getElementById("list");
+  const items = allPosts.filter(p => currentFilter === "all" || p.pillar === currentFilter);
+  if (!items.length) { list.innerHTML = '<div class="empty">該当する投稿がありません</div>'; return; }
+  list.innerHTML = items.map((p, i) => {
+    const len = [...(p.text || "")].length;
+    return `
+    <div class="card" data-pillar="${p.pillar || ""}">
+      <div class="tags">
+        <span class="tag pillar">${p.pillar || "その他"}</span>
+        <span class="tag">${p.type || ""}</span>
+        ${p.trend ? '<span class="tag trend">トレンド</span>' : ""}
+        <span class="num">#${String(i + 1).padStart(2, "0")}</span>
+      </div>
+      <p class="text">${escapeHtml(p.text || "")}</p>
+      <span class="count">${len}字</span>
+      <button class="copy" onclick='copyPost(this, ${JSON.stringify(p.text || "")})'>コピー</button>
+      <div class="clear"></div>
+    </div>`;
+  }).join("");
+}
+
+function copyPost(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = "コピー済み ✓";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = "コピー"; btn.classList.remove("done"); }, 1600);
+  });
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+</script>
+</body>
+</html>
