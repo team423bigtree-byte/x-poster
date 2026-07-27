@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Yuki mental log — 投稿ストック</title>
+<title>投稿ストック</title>
 <style>
   :root {
     --ink: #1c1a17;
@@ -84,9 +84,11 @@
   .card[data-pillar="メンタル"] .tag.pillar { background: var(--mental); }
   .card[data-pillar="職場あるある"] .tag.pillar { background: var(--work); }
   .tag.trend { background: #2f2b26; color: #fff; }
+  .tag.casual { background: #d98c4a; color: #fff; }
   .num { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .text { white-space: pre-wrap; font-size: 15px; margin: 0 0 12px; }
   .count { font-size: 11px; color: var(--muted); }
+  .copycount { font-size: 11px; color: var(--muted); margin-left: 10px; }
   .copy {
     float: right; padding: 8px 16px; font-size: 13px; font-weight: 700;
     border: 1px solid var(--accent); border-radius: 9px; background: var(--accent);
@@ -113,7 +115,6 @@
 
 <div class="wrap hidden" id="app">
   <header>
-    <div class="kicker">Yuki mental log</div>
     <h1>投稿ストック</h1>
     <div class="sub">1タップでコピーして、そのまま投稿へ</div>
   </header>
@@ -140,6 +141,7 @@ const PASSWORD = "fjix7exSD6Ka";
 
 let allPosts = [];
 let currentFilter = "all";
+let currentDate = "";
 
 function unlock() {
   const v = document.getElementById("pw").value;
@@ -175,6 +177,7 @@ async function init() {
 }
 
 async function loadDate(date) {
+  currentDate = date;
   const rec = await fetch(`posts/${date}.json`).then(r => r.json());
   allPosts = rec.posts || [];
   const modeLabel = rec.mode === "manual"
@@ -197,16 +200,20 @@ function render() {
   if (!items.length) { list.innerHTML = '<div class="empty">該当する投稿がありません</div>'; return; }
   list.innerHTML = items.map((p, i) => {
     const len = [...(p.text || "")].length;
+    const key = countKey(p.text || "");
+    const cnt = getCount(key);
     return `
     <div class="card" data-pillar="${p.pillar || ""}">
       <div class="tags">
         <span class="tag pillar">${p.pillar || "その他"}</span>
         <span class="tag">${p.type || ""}</span>
         ${p.trend ? '<span class="tag trend">トレンド</span>' : ""}
+        ${p.type === "ラフ雑談" ? '<span class="tag casual">ラフ</span>' : ""}
         <span class="num">#${String(i + 1).padStart(2, "0")}</span>
       </div>
       <p class="text">${escapeHtml(p.text || "")}</p>
       <span class="count">${len}字</span>
+      <span class="copycount" data-key="${key}">${cnt > 0 ? "コピー " + cnt + "回" : ""}</span>
       <button class="copy" onclick='copyPost(this, ${JSON.stringify(p.text || "")})'>コピー</button>
       <div class="clear"></div>
     </div>`;
@@ -217,8 +224,31 @@ function copyPost(btn, text) {
   navigator.clipboard.writeText(text).then(() => {
     btn.textContent = "コピー済み ✓";
     btn.classList.add("done");
+    // コピー回数をカウント（端末内に保存）
+    const key = countKey(text);
+    const n = getCount(key) + 1;
+    setCount(key, n);
+    const label = btn.parentElement.querySelector(".copycount");
+    if (label) label.textContent = "コピー " + n + "回";
     setTimeout(() => { btn.textContent = "コピー"; btn.classList.remove("done"); }, 1600);
   });
+}
+
+// ===== コピー回数の保存（localStorage・この端末内のみ） =====
+function countKey(text) {
+  // 日付 + 本文の簡易ハッシュで一意キーを作る
+  let h = 0;
+  for (let i = 0; i < text.length; i++) {
+    h = (h * 31 + text.charCodeAt(i)) & 0xffffffff;
+  }
+  return "cc:" + currentDate + ":" + h;
+}
+function getCount(key) {
+  try { return parseInt(localStorage.getItem(key) || "0", 10); }
+  catch (e) { return 0; }
+}
+function setCount(key, n) {
+  try { localStorage.setItem(key, String(n)); } catch (e) {}
 }
 
 function escapeHtml(s) {
